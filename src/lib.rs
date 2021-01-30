@@ -25,7 +25,6 @@ A high-level, safe, zero-allocation TrueType font parser.
 */
 
 #![doc(html_root_url = "https://docs.rs/ttf-parser/0.10.1")]
-
 #![no_std]
 #![forbid(unsafe_code)]
 #![warn(missing_docs)]
@@ -48,25 +47,26 @@ macro_rules! try_opt_or {
     };
 }
 
-pub mod parser;
 mod ggg;
+pub mod parser;
 mod tables;
-#[cfg(feature = "variable-fonts")] mod var_store;
+#[cfg(feature = "variable-fonts")]
+mod var_store;
 
 #[cfg(feature = "std")]
 mod writer;
 
-use tables::*;
-use parser::{Stream, FromData, NumFrom, TryNumFrom, LazyArray16, Offset32, Offset};
 use head::IndexToLocationFormat;
+use parser::{FromData, LazyArray16, NumFrom, Offset, Offset32, Stream, TryNumFrom};
+use tables::*;
 
-#[cfg(feature = "variable-fonts")] pub use fvar::{VariationAxes, VariationAxis};
+#[cfg(feature = "variable-fonts")]
+pub use fvar::{VariationAxes, VariationAxis};
 pub use gdef::GlyphClass;
 pub use ggg::*;
 pub use name::*;
 pub use os2::*;
 pub use tables::{cmap, kern};
-
 
 /// A type-safe wrapper for glyph ID.
 #[repr(transparent)]
@@ -81,7 +81,6 @@ impl FromData for GlyphId {
         u16::parse(data).map(GlyphId)
     }
 }
-
 
 /// A TrueType font magic.
 ///
@@ -106,7 +105,6 @@ impl FromData for Magic {
         }
     }
 }
-
 
 /// A variation coordinate in a normalized coordinate system.
 ///
@@ -146,7 +144,6 @@ impl NormalizedCoordinate {
     }
 }
 
-
 /// A font variation value.
 ///
 /// # Example
@@ -164,7 +161,6 @@ pub struct Variation {
     pub value: f32,
 }
 
-
 /// A 4-byte tag.
 #[repr(transparent)]
 #[derive(Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash)]
@@ -174,8 +170,10 @@ impl Tag {
     /// Creates a `Tag` from bytes.
     #[inline]
     pub const fn from_bytes(bytes: &[u8; 4]) -> Self {
-        Tag(((bytes[0] as u32) << 24) | ((bytes[1] as u32) << 16) |
-            ((bytes[2] as u32) << 8) | (bytes[3] as u32))
+        Tag(((bytes[0] as u32) << 24)
+            | ((bytes[1] as u32) << 16)
+            | ((bytes[2] as u32) << 8)
+            | (bytes[3] as u32))
     }
 
     /// Creates a `Tag` from bytes.
@@ -290,8 +288,6 @@ impl FromData for Tag {
     }
 }
 
-
-
 /// A line metrics.
 ///
 /// Used for underline and strikeout.
@@ -304,7 +300,6 @@ pub struct LineMetrics {
     /// Line thickness.
     pub thickness: i16,
 }
-
 
 /// A rectangle.
 #[repr(C)]
@@ -331,7 +326,6 @@ impl Rect {
     }
 }
 
-
 #[derive(Clone, Copy, Debug)]
 pub(crate) struct BBox {
     x_min: f32,
@@ -353,10 +347,10 @@ impl BBox {
 
     #[inline]
     fn is_default(&self) -> bool {
-        self.x_min == core::f32::MAX &&
-        self.y_min == core::f32::MAX &&
-        self.x_max == core::f32::MIN &&
-        self.y_max == core::f32::MIN
+        self.x_min == core::f32::MAX
+            && self.y_min == core::f32::MAX
+            && self.x_max == core::f32::MIN
+            && self.y_max == core::f32::MIN
     }
 
     #[inline]
@@ -377,7 +371,6 @@ impl BBox {
         })
     }
 }
-
 
 /// A trait for glyph outline construction.
 pub trait OutlineBuilder {
@@ -401,7 +394,6 @@ pub trait OutlineBuilder {
     fn close(&mut self);
 }
 
-
 struct DummyOutline;
 impl OutlineBuilder for DummyOutline {
     fn move_to(&mut self, _: f32, _: f32) {}
@@ -411,14 +403,12 @@ impl OutlineBuilder for DummyOutline {
     fn close(&mut self) {}
 }
 
-
 /// A glyph raster image format.
 #[allow(missing_docs)]
 #[derive(Clone, Copy, PartialEq, Debug)]
 pub enum RasterImageFormat {
     PNG,
 }
-
 
 /// A glyph's raster image.
 ///
@@ -450,7 +440,6 @@ pub struct RasterGlyphImage<'a> {
     /// A raw image data. It's up to the caller to decode it.
     pub data: &'a [u8],
 }
-
 
 /// A table name.
 #[repr(C)]
@@ -486,7 +475,6 @@ pub enum TableName {
     WindowsMetrics,
 }
 
-
 #[derive(Clone, Copy)]
 struct TableRecord {
     table_tag: Tag,
@@ -511,7 +499,6 @@ impl FromData for TableRecord {
     }
 }
 
-
 #[cfg(feature = "variable-fonts")]
 const MAX_VAR_COORDS: usize = 32;
 
@@ -535,7 +522,6 @@ impl VarCoords {
         &mut self.data[0..end]
     }
 }
-
 
 /// A list of font face parsing errors.
 #[derive(Clone, Copy, PartialEq, Debug)]
@@ -577,7 +563,6 @@ impl core::fmt::Display for FaceParsingError {
 #[cfg(feature = "std")]
 impl std::error::Error for FaceParsingError {}
 
-
 /// A font face handle.
 #[derive(Clone)]
 pub struct Face<'a> {
@@ -590,6 +575,7 @@ pub struct Face<'a> {
     cmap: Option<cmap::Subtables<'a>>,
     gdef: Option<gdef::Table<'a>>,
     glyf: Option<&'a [u8]>,
+    gsub: Option<gsub::Table<'a>>,
     head: &'a [u8],
     hhea: &'a [u8],
     hmtx: Option<hmtx::Table<'a>>,
@@ -605,16 +591,24 @@ pub struct Face<'a> {
     vorg: Option<vorg::Table<'a>>,
 
     // Variable font tables.
-    #[cfg(feature = "variable-fonts")] avar: Option<avar::Table<'a>>,
-    #[cfg(feature = "variable-fonts")] cff2: Option<cff2::Metadata<'a>>,
-    #[cfg(feature = "variable-fonts")] fvar: Option<fvar::Table<'a>>,
-    #[cfg(feature = "variable-fonts")] gvar: Option<gvar::Table<'a>>,
-    #[cfg(feature = "variable-fonts")] hvar: Option<hvar::Table<'a>>,
-    #[cfg(feature = "variable-fonts")] mvar: Option<mvar::Table<'a>>,
-    #[cfg(feature = "variable-fonts")] vvar: Option<hvar::Table<'a>>,
+    #[cfg(feature = "variable-fonts")]
+    avar: Option<avar::Table<'a>>,
+    #[cfg(feature = "variable-fonts")]
+    cff2: Option<cff2::Metadata<'a>>,
+    #[cfg(feature = "variable-fonts")]
+    fvar: Option<fvar::Table<'a>>,
+    #[cfg(feature = "variable-fonts")]
+    gvar: Option<gvar::Table<'a>>,
+    #[cfg(feature = "variable-fonts")]
+    hvar: Option<hvar::Table<'a>>,
+    #[cfg(feature = "variable-fonts")]
+    mvar: Option<mvar::Table<'a>>,
+    #[cfg(feature = "variable-fonts")]
+    vvar: Option<hvar::Table<'a>>,
 
     number_of_glyphs: NonZeroU16,
-    #[cfg(feature = "variable-fonts")] coordinates: VarCoords,
+    #[cfg(feature = "variable-fonts")]
+    coordinates: VarCoords,
 }
 
 impl<'a> Face<'a> {
@@ -639,15 +633,21 @@ impl<'a> Face<'a> {
         if magic == Magic::FontCollection {
             s.skip::<u32>(); // version
             let number_of_faces: u32 = s.read().ok_or(FaceParsingError::MalformedFont)?;
-            let offsets = s.read_array32::<Offset32>(number_of_faces)
+            let offsets = s
+                .read_array32::<Offset32>(number_of_faces)
                 .ok_or(FaceParsingError::MalformedFont)?;
 
-            let face_offset = offsets.get(index).ok_or(FaceParsingError::FaceIndexOutOfBounds)?;
+            let face_offset = offsets
+                .get(index)
+                .ok_or(FaceParsingError::FaceIndexOutOfBounds)?;
             // Face offset is from the start of the font data,
             // so we have to adjust it to the current parser offset.
-            let face_offset = face_offset.to_usize().checked_sub(s.offset())
+            let face_offset = face_offset
+                .to_usize()
+                .checked_sub(s.offset())
                 .ok_or(FaceParsingError::MalformedFont)?;
-            s.advance_checked(face_offset).ok_or(FaceParsingError::MalformedFont)?;
+            s.advance_checked(face_offset)
+                .ok_or(FaceParsingError::MalformedFont)?;
 
             // Read **face** magic.
             // Each face in a font collection also starts with a magic.
@@ -660,7 +660,8 @@ impl<'a> Face<'a> {
 
         let num_tables: u16 = s.read().ok_or(FaceParsingError::MalformedFont)?;
         s.advance(6); // searchRange (u16) + entrySelector (u16) + rangeShift (u16)
-        let tables = s.read_array16::<TableRecord>(num_tables)
+        let tables = s
+            .read_array16::<TableRecord>(num_tables)
             .ok_or(FaceParsingError::MalformedFont)?;
 
         let mut face = Face {
@@ -671,6 +672,7 @@ impl<'a> Face<'a> {
             cff1: None,
             cmap: None,
             gdef: None,
+            gsub: None,
             glyf: None,
             head: &[],
             hhea: &[],
@@ -685,15 +687,23 @@ impl<'a> Face<'a> {
             sbix: None,
             svg_: None,
             vorg: None,
-            #[cfg(feature = "variable-fonts")] avar: None,
-            #[cfg(feature = "variable-fonts")] cff2: None,
-            #[cfg(feature = "variable-fonts")] fvar: None,
-            #[cfg(feature = "variable-fonts")] gvar: None,
-            #[cfg(feature = "variable-fonts")] hvar: None,
-            #[cfg(feature = "variable-fonts")] mvar: None,
-            #[cfg(feature = "variable-fonts")] vvar: None,
+            #[cfg(feature = "variable-fonts")]
+            avar: None,
+            #[cfg(feature = "variable-fonts")]
+            cff2: None,
+            #[cfg(feature = "variable-fonts")]
+            fvar: None,
+            #[cfg(feature = "variable-fonts")]
+            gvar: None,
+            #[cfg(feature = "variable-fonts")]
+            hvar: None,
+            #[cfg(feature = "variable-fonts")]
+            mvar: None,
+            #[cfg(feature = "variable-fonts")]
+            vvar: None,
             number_of_glyphs: NonZeroU16::new(1).unwrap(), // dummy
-            #[cfg(feature = "variable-fonts")] coordinates: VarCoords::default(),
+            #[cfg(feature = "variable-fonts")]
+            coordinates: VarCoords::default(),
         };
 
         let mut number_of_glyphs = None;
@@ -704,7 +714,9 @@ impl<'a> Face<'a> {
         for table in tables {
             let offset = usize::num_from(table.offset);
             let length = usize::num_from(table.length);
-            let end = offset.checked_add(length).ok_or(FaceParsingError::MalformedFont)?;
+            let end = offset
+                .checked_add(length)
+                .ok_or(FaceParsingError::MalformedFont)?;
             let range = offset..end;
 
             match &table.table_tag.to_bytes() {
@@ -714,6 +726,7 @@ impl<'a> Face<'a> {
                 #[cfg(feature = "variable-fonts")]
                 b"CFF2" => face.cff2 = data.get(range).and_then(|data| cff2::parse_metadata(data)),
                 b"GDEF" => face.gdef = data.get(range).and_then(|data| gdef::Table::parse(data)),
+                b"GSUB" => face.gsub = data.get(range).and_then(|data| gsub::Table::parse(data)),
                 #[cfg(feature = "variable-fonts")]
                 b"HVAR" => face.hvar = data.get(range).and_then(|data| hvar::Table::parse(data)),
                 #[cfg(feature = "variable-fonts")]
@@ -731,8 +744,18 @@ impl<'a> Face<'a> {
                 b"glyf" => face.glyf = data.get(range),
                 #[cfg(feature = "variable-fonts")]
                 b"gvar" => face.gvar = data.get(range).and_then(|data| gvar::Table::parse(data)),
-                b"head" => face.head = data.get(range).and_then(|data| head::parse(data)).unwrap_or_default(),
-                b"hhea" => face.hhea = data.get(range).and_then(|data| hhea::parse(data)).unwrap_or_default(),
+                b"head" => {
+                    face.head = data
+                        .get(range)
+                        .and_then(|data| head::parse(data))
+                        .unwrap_or_default()
+                }
+                b"hhea" => {
+                    face.hhea = data
+                        .get(range)
+                        .and_then(|data| hhea::parse(data))
+                        .unwrap_or_default()
+                }
                 b"hmtx" => hmtx = data.get(range),
                 b"kern" => face.kern = data.get(range).and_then(|data| kern::parse(data)),
                 b"loca" => loca = data.get(range),
@@ -759,7 +782,8 @@ impl<'a> Face<'a> {
             None => return Err(FaceParsingError::NoMaxpTable),
         };
 
-        #[cfg(feature = "variable-fonts")] {
+        #[cfg(feature = "variable-fonts")]
+        {
             if let Some(ref fvar) = face.fvar {
                 face.coordinates.len = fvar.axes().count().min(MAX_VAR_COORDS) as u8;
             }
@@ -793,33 +817,33 @@ impl<'a> Face<'a> {
     #[inline]
     pub fn has_table(&self, name: TableName) -> bool {
         match name {
-            TableName::Header                       => true,
-            TableName::HorizontalHeader             => true,
-            TableName::MaximumProfile               => true,
-            TableName::AxisVariations               => self.avar.is_some(),
+            TableName::Header => true,
+            TableName::HorizontalHeader => true,
+            TableName::MaximumProfile => true,
+            TableName::AxisVariations => self.avar.is_some(),
             TableName::CharacterToGlyphIndexMapping => self.cmap.is_some(),
-            TableName::ColorBitmapData              => self.cbdt.is_some(),
-            TableName::ColorBitmapLocation          => self.cblc.is_some(),
-            TableName::CompactFontFormat            => self.cff1.is_some(),
-            TableName::CompactFontFormat2           => self.cff2.is_some(),
-            TableName::FontVariations               => self.fvar.is_some(),
-            TableName::GlyphData                    => self.glyf.is_some(),
-            TableName::GlyphDefinition              => self.gdef.is_some(),
-            TableName::GlyphVariations              => self.gvar.is_some(),
-            TableName::HorizontalMetrics            => self.hmtx.is_some(),
-            TableName::HorizontalMetricsVariations  => self.hvar.is_some(),
-            TableName::IndexToLocation              => self.loca.is_some(),
-            TableName::Kerning                      => self.kern.is_some(),
-            TableName::MetricsVariations            => self.mvar.is_some(),
-            TableName::Naming                       => self.name.is_some(),
-            TableName::PostScript                   => self.post.is_some(),
-            TableName::ScalableVectorGraphics       => self.svg_.is_some(),
-            TableName::StandardBitmapGraphics       => self.sbix.is_some(),
-            TableName::VerticalHeader               => self.vhea.is_some(),
-            TableName::VerticalMetrics              => self.vmtx.is_some(),
-            TableName::VerticalMetricsVariations    => self.vvar.is_some(),
-            TableName::VerticalOrigin               => self.vorg.is_some(),
-            TableName::WindowsMetrics               => self.os_2.is_some(),
+            TableName::ColorBitmapData => self.cbdt.is_some(),
+            TableName::ColorBitmapLocation => self.cblc.is_some(),
+            TableName::CompactFontFormat => self.cff1.is_some(),
+            TableName::CompactFontFormat2 => self.cff2.is_some(),
+            TableName::FontVariations => self.fvar.is_some(),
+            TableName::GlyphData => self.glyf.is_some(),
+            TableName::GlyphDefinition => self.gdef.is_some(),
+            TableName::GlyphVariations => self.gvar.is_some(),
+            TableName::HorizontalMetrics => self.hmtx.is_some(),
+            TableName::HorizontalMetricsVariations => self.hvar.is_some(),
+            TableName::IndexToLocation => self.loca.is_some(),
+            TableName::Kerning => self.kern.is_some(),
+            TableName::MetricsVariations => self.mvar.is_some(),
+            TableName::Naming => self.name.is_some(),
+            TableName::PostScript => self.post.is_some(),
+            TableName::ScalableVectorGraphics => self.svg_.is_some(),
+            TableName::StandardBitmapGraphics => self.sbix.is_some(),
+            TableName::VerticalHeader => self.vhea.is_some(),
+            TableName::VerticalMetrics => self.vmtx.is_some(),
+            TableName::VerticalMetricsVariations => self.vvar.is_some(),
+            TableName::VerticalOrigin => self.vorg.is_some(),
+            TableName::WindowsMetrics => self.os_2.is_some(),
         }
     }
 
@@ -830,33 +854,33 @@ impl<'a> Face<'a> {
     #[inline]
     pub fn has_table(&self, name: TableName) -> bool {
         match name {
-            TableName::Header                       => true,
-            TableName::HorizontalHeader             => true,
-            TableName::MaximumProfile               => true,
-            TableName::AxisVariations               => false,
+            TableName::Header => true,
+            TableName::HorizontalHeader => true,
+            TableName::MaximumProfile => true,
+            TableName::AxisVariations => false,
             TableName::CharacterToGlyphIndexMapping => self.cmap.is_some(),
-            TableName::ColorBitmapData              => self.cbdt.is_some(),
-            TableName::ColorBitmapLocation          => self.cblc.is_some(),
-            TableName::CompactFontFormat            => self.cff1.is_some(),
-            TableName::CompactFontFormat2           => false,
-            TableName::FontVariations               => false,
-            TableName::GlyphData                    => self.glyf.is_some(),
-            TableName::GlyphDefinition              => self.gdef.is_some(),
-            TableName::GlyphVariations              => false,
-            TableName::HorizontalMetrics            => self.hmtx.is_some(),
-            TableName::HorizontalMetricsVariations  => false,
-            TableName::IndexToLocation              => self.loca.is_some(),
-            TableName::Kerning                      => self.kern.is_some(),
-            TableName::MetricsVariations            => false,
-            TableName::Naming                       => self.name.is_some(),
-            TableName::PostScript                   => self.post.is_some(),
-            TableName::ScalableVectorGraphics       => self.svg_.is_some(),
-            TableName::StandardBitmapGraphics       => self.sbix.is_some(),
-            TableName::VerticalHeader               => self.vhea.is_some(),
-            TableName::VerticalMetrics              => self.vmtx.is_some(),
-            TableName::VerticalMetricsVariations    => false,
-            TableName::VerticalOrigin               => self.vorg.is_some(),
-            TableName::WindowsMetrics               => self.os_2.is_some(),
+            TableName::ColorBitmapData => self.cbdt.is_some(),
+            TableName::ColorBitmapLocation => self.cblc.is_some(),
+            TableName::CompactFontFormat => self.cff1.is_some(),
+            TableName::CompactFontFormat2 => false,
+            TableName::FontVariations => false,
+            TableName::GlyphData => self.glyf.is_some(),
+            TableName::GlyphDefinition => self.gdef.is_some(),
+            TableName::GlyphVariations => false,
+            TableName::HorizontalMetrics => self.hmtx.is_some(),
+            TableName::HorizontalMetricsVariations => false,
+            TableName::IndexToLocation => self.loca.is_some(),
+            TableName::Kerning => self.kern.is_some(),
+            TableName::MetricsVariations => false,
+            TableName::Naming => self.name.is_some(),
+            TableName::PostScript => self.post.is_some(),
+            TableName::ScalableVectorGraphics => self.svg_.is_some(),
+            TableName::StandardBitmapGraphics => self.sbix.is_some(),
+            TableName::VerticalHeader => self.vhea.is_some(),
+            TableName::VerticalMetrics => self.vmtx.is_some(),
+            TableName::VerticalMetricsVariations => false,
+            TableName::VerticalOrigin => self.vorg.is_some(),
+            TableName::WindowsMetrics => self.os_2.is_some(),
         }
     }
 
@@ -864,7 +888,9 @@ impl<'a> Face<'a> {
     ///
     /// Useful if you want to parse the data manually.
     pub fn table_data(&self, tag: Tag) -> Option<&'a [u8]> {
-        let (_, table) = self.table_records.binary_search_by(|record| record.table_tag.cmp(&tag))?;
+        let (_, table) = self
+            .table_records
+            .binary_search_by(|record| record.table_tag.cmp(&tag))?;
         let offset = usize::num_from(table.offset);
         let length = usize::num_from(table.length);
         let end = offset.checked_add(length)?;
@@ -926,12 +952,14 @@ impl<'a> Face<'a> {
     /// Simply checks the presence of a `fvar` table.
     #[inline]
     pub fn is_variable(&self) -> bool {
-        #[cfg(feature = "variable-fonts")] {
+        #[cfg(feature = "variable-fonts")]
+        {
             // `fvar::Table::parse` already checked that `axisCount` is non-zero.
             self.fvar.is_some()
         }
 
-        #[cfg(not(feature = "variable-fonts"))] {
+        #[cfg(not(feature = "variable-fonts"))]
+        {
             false
         }
     }
@@ -1067,7 +1095,8 @@ impl<'a> Face<'a> {
     /// This method is affected by variation axes.
     #[inline]
     pub fn vertical_ascender(&self) -> Option<i16> {
-        self.vhea.map(vhea::ascender)
+        self.vhea
+            .map(vhea::ascender)
             .map(|v| self.apply_metrics_variation(Tag::from_bytes(b"vasc"), v))
     }
 
@@ -1076,7 +1105,8 @@ impl<'a> Face<'a> {
     /// This method is affected by variation axes.
     #[inline]
     pub fn vertical_descender(&self) -> Option<i16> {
-        self.vhea.map(vhea::descender)
+        self.vhea
+            .map(vhea::descender)
             .map(|v| self.apply_metrics_variation(Tag::from_bytes(b"vdsc"), v))
     }
 
@@ -1093,7 +1123,8 @@ impl<'a> Face<'a> {
     /// This method is affected by variation axes.
     #[inline]
     pub fn vertical_line_gap(&self) -> Option<i16> {
-        self.vhea.map(vhea::line_gap)
+        self.vhea
+            .map(vhea::line_gap)
             .map(|v| self.apply_metrics_variation(Tag::from_bytes(b"vlgp"), v))
     }
 
@@ -1112,7 +1143,8 @@ impl<'a> Face<'a> {
     /// Returns `None` when OS/2 table is not present or when its version is < 2.
     #[inline]
     pub fn x_height(&self) -> Option<i16> {
-        self.os_2.and_then(|os_2| os_2.x_height())
+        self.os_2
+            .and_then(|os_2| os_2.x_height())
             .map(|v| self.apply_metrics_variation(Tag::from_bytes(b"xhgt"), v))
     }
 
@@ -1123,7 +1155,8 @@ impl<'a> Face<'a> {
     /// Returns `None` when OS/2 table is not present or when its version is < 2.
     #[inline]
     pub fn capital_height(&self) -> Option<i16> {
-        self.os_2.and_then(|os_2| os_2.cap_height())
+        self.os_2
+            .and_then(|os_2| os_2.cap_height())
             .map(|v| self.apply_metrics_variation(Tag::from_bytes(b"cpht"), v))
     }
 
@@ -1251,7 +1284,8 @@ impl<'a> Face<'a> {
     /// Returns `None` instead of `0` when glyph is not found.
     #[inline]
     pub fn glyph_variation_index(&self, c: char, variation: char) -> Option<GlyphId> {
-        let res = self.character_mapping_subtables()
+        let res = self
+            .character_mapping_subtables()
             .find(|e| e.format() == cmap::Format::UnicodeVariationSequences)
             .and_then(|e| e.glyph_variation_index(c, variation))?;
 
@@ -1266,21 +1300,24 @@ impl<'a> Face<'a> {
     /// This method is affected by variation axes.
     #[inline]
     pub fn glyph_hor_advance(&self, glyph_id: GlyphId) -> Option<u16> {
-        #[cfg(feature = "variable-fonts")] {
+        #[cfg(feature = "variable-fonts")]
+        {
             let mut advance = self.hmtx?.advance(glyph_id)? as f32;
 
             if self.is_variable() {
                 // Ignore variation offset when `hvar` is not set.
                 if let Some(hvar_data) = self.hvar {
                     // We can't use `round()` in `no_std`, so this is the next best thing.
-                    advance += hvar::glyph_advance_offset(hvar_data, glyph_id, self.coords())? + 0.5;
+                    advance +=
+                        hvar::glyph_advance_offset(hvar_data, glyph_id, self.coords())? + 0.5;
                 }
             }
 
             u16::try_num_from(advance)
         }
 
-        #[cfg(not(feature = "variable-fonts"))] {
+        #[cfg(not(feature = "variable-fonts"))]
+        {
             self.hmtx?.advance(glyph_id)
         }
     }
@@ -1290,21 +1327,24 @@ impl<'a> Face<'a> {
     /// This method is affected by variation axes.
     #[inline]
     pub fn glyph_ver_advance(&self, glyph_id: GlyphId) -> Option<u16> {
-        #[cfg(feature = "variable-fonts")] {
+        #[cfg(feature = "variable-fonts")]
+        {
             let mut advance = self.vmtx?.advance(glyph_id)? as f32;
 
             if self.is_variable() {
                 // Ignore variation offset when `vvar` is not set.
                 if let Some(vvar_data) = self.vvar {
                     // We can't use `round()` in `no_std`, so this is the next best thing.
-                    advance += hvar::glyph_advance_offset(vvar_data, glyph_id, self.coords())? + 0.5;
+                    advance +=
+                        hvar::glyph_advance_offset(vvar_data, glyph_id, self.coords())? + 0.5;
                 }
             }
 
             u16::try_num_from(advance)
         }
 
-        #[cfg(not(feature = "variable-fonts"))] {
+        #[cfg(not(feature = "variable-fonts"))]
+        {
             self.vmtx?.advance(glyph_id)
         }
     }
@@ -1314,21 +1354,24 @@ impl<'a> Face<'a> {
     /// This method is affected by variation axes.
     #[inline]
     pub fn glyph_hor_side_bearing(&self, glyph_id: GlyphId) -> Option<i16> {
-        #[cfg(feature = "variable-fonts")] {
+        #[cfg(feature = "variable-fonts")]
+        {
             let mut bearing = self.hmtx?.side_bearing(glyph_id)? as f32;
 
             if self.is_variable() {
                 // Ignore variation offset when `hvar` is not set.
                 if let Some(hvar_data) = self.hvar {
                     // We can't use `round()` in `no_std`, so this is the next best thing.
-                    bearing += hvar::glyph_side_bearing_offset(hvar_data, glyph_id, self.coords())? + 0.5;
+                    bearing +=
+                        hvar::glyph_side_bearing_offset(hvar_data, glyph_id, self.coords())? + 0.5;
                 }
             }
 
             i16::try_num_from(bearing)
         }
 
-        #[cfg(not(feature = "variable-fonts"))] {
+        #[cfg(not(feature = "variable-fonts"))]
+        {
             self.hmtx?.side_bearing(glyph_id)
         }
     }
@@ -1338,21 +1381,24 @@ impl<'a> Face<'a> {
     /// This method is affected by variation axes.
     #[inline]
     pub fn glyph_ver_side_bearing(&self, glyph_id: GlyphId) -> Option<i16> {
-        #[cfg(feature = "variable-fonts")] {
+        #[cfg(feature = "variable-fonts")]
+        {
             let mut bearing = self.vmtx?.side_bearing(glyph_id)? as f32;
 
             if self.is_variable() {
                 // Ignore variation offset when `vvar` is not set.
                 if let Some(vvar_data) = self.vvar {
                     // We can't use `round()` in `no_std`, so this is the next best thing.
-                    bearing += hvar::glyph_side_bearing_offset(vvar_data, glyph_id, self.coords())? + 0.5;
+                    bearing +=
+                        hvar::glyph_side_bearing_offset(vvar_data, glyph_id, self.coords())? + 0.5;
                 }
             }
 
             i16::try_num_from(bearing)
         }
 
-        #[cfg(not(feature = "variable-fonts"))] {
+        #[cfg(not(feature = "variable-fonts"))]
+        {
             self.vmtx?.side_bearing(glyph_id)
         }
     }
@@ -1374,7 +1420,11 @@ impl<'a> Face<'a> {
             return Some(name);
         }
 
-        if let Some(name) = self.cff1.as_ref().and_then(|cff1| cff1::glyph_name(cff1, glyph_id)) {
+        if let Some(name) = self
+            .cff1
+            .as_ref()
+            .and_then(|cff1| cff1::glyph_name(cff1, glyph_id))
+        {
             return Some(name);
         }
 
@@ -1424,8 +1474,9 @@ impl<'a> Face<'a> {
     #[cfg(feature = "variable-fonts")]
     #[inline]
     pub fn glyph_variation_delta(&self, outer_index: u16, inner_index: u16) -> Option<f32> {
-        self.gdef.and_then(|gdef|
-            gdef.variation_delta(outer_index, inner_index, self.coordinates.as_slice()))
+        self.gdef.and_then(|gdef| {
+            gdef.variation_delta(outer_index, inner_index, self.coordinates.as_slice())
+        })
     }
 
     /// Returns a iterator over kerning subtables.
@@ -1497,9 +1548,17 @@ impl<'a> Face<'a> {
         glyph_id: GlyphId,
         builder: &mut dyn OutlineBuilder,
     ) -> Option<Rect> {
-        #[cfg(feature = "variable-fonts")] {
+        #[cfg(feature = "variable-fonts")]
+        {
             if let Some(ref gvar_table) = self.gvar {
-                return gvar::outline(self.loca?, self.glyf?, gvar_table, self.coords(), glyph_id, builder);
+                return gvar::outline(
+                    self.loca?,
+                    self.glyf?,
+                    gvar_table,
+                    self.coords(),
+                    glyph_id,
+                    builder,
+                );
             }
         }
 
@@ -1511,7 +1570,8 @@ impl<'a> Face<'a> {
             return cff1::outline(metadata, glyph_id, builder);
         }
 
-        #[cfg(feature = "variable-fonts")] {
+        #[cfg(feature = "variable-fonts")]
+        {
             if let Some(ref metadata) = self.cff2 {
                 return cff2::outline(metadata, self.coords(), glyph_id, builder);
             }
@@ -1581,7 +1641,11 @@ impl<'a> Face<'a> {
     /// and this method supports only `sbix`, `CBLC`+`CBDT`.
     /// Font's tables be accesses in this specific order.
     #[inline]
-    pub fn glyph_raster_image(&self, glyph_id: GlyphId, pixels_per_em: u16) -> Option<RasterGlyphImage> {
+    pub fn glyph_raster_image(
+        &self,
+        glyph_id: GlyphId,
+        pixels_per_em: u16,
+    ) -> Option<RasterGlyphImage> {
         if let Some(sbix_data) = self.sbix {
             return sbix::parse(sbix_data, self.number_of_glyphs, glyph_id, pixels_per_em, 0);
         }
@@ -1607,7 +1671,8 @@ impl<'a> Face<'a> {
     /// you should also try `outline_glyph()` afterwards.
     #[inline]
     pub fn glyph_svg_image(&self, glyph_id: GlyphId) -> Option<&'a [u8]> {
-        self.svg_.and_then(|svg_data| svg::parse(svg_data, glyph_id))
+        self.svg_
+            .and_then(|svg_data| svg::parse(svg_data, glyph_id))
     }
 
     /// Returns an iterator over variation axes.
@@ -1632,7 +1697,10 @@ impl<'a> Face<'a> {
             return None;
         }
 
-        let v = self.variation_axes().enumerate().find(|(_, a)| a.tag == axis);
+        let v = self
+            .variation_axes()
+            .enumerate()
+            .find(|(_, a)| a.tag == axis);
         if let Some((idx, a)) = v {
             if idx >= MAX_VAR_COORDS {
                 return None;
@@ -1669,7 +1737,9 @@ impl<'a> Face<'a> {
     #[cfg(feature = "variable-fonts")]
     #[inline]
     fn metrics_var_offset(&self, tag: Tag) -> f32 {
-        self.mvar.and_then(|table| table.metrics_offset(tag, self.coords())).unwrap_or(0.0)
+        self.mvar
+            .and_then(|table| table.metrics_offset(tag, self.coords()))
+            .unwrap_or(0.0)
     }
 
     #[inline]
@@ -1677,7 +1747,6 @@ impl<'a> Face<'a> {
         self.apply_metrics_variation_to(tag, &mut value);
         value
     }
-
 
     #[cfg(feature = "variable-fonts")]
     #[inline]
@@ -1693,8 +1762,7 @@ impl<'a> Face<'a> {
 
     #[cfg(not(feature = "variable-fonts"))]
     #[inline]
-    fn apply_metrics_variation_to(&self, _: Tag, _: &mut i16) {
-    }
+    fn apply_metrics_variation_to(&self, _: Tag, _: &mut i16) {}
 
     #[cfg(feature = "variable-fonts")]
     #[inline]
@@ -1723,15 +1791,16 @@ pub fn fonts_in_collection(data: &[u8]) -> Option<u32> {
     s.read::<u32>()
 }
 
-
 #[cfg(test)]
 mod tests {
     use super::*;
 
     #[test]
     fn empty_font() {
-        assert_eq!(Face::from_slice(&[], 0).unwrap_err(),
-                   FaceParsingError::UnknownMagic);
+        assert_eq!(
+            Face::from_slice(&[], 0).unwrap_err(),
+            FaceParsingError::UnknownMagic
+        );
     }
 
     #[test]
@@ -1744,8 +1813,10 @@ mod tests {
             0x00, 0x00, // rangeShift: 0
         ];
 
-        assert_eq!(Face::from_slice(data, 0).unwrap_err(),
-                   FaceParsingError::NoHeadTable);
+        assert_eq!(
+            Face::from_slice(data, 0).unwrap_err(),
+            FaceParsingError::NoHeadTable
+        );
     }
 
     #[test]
@@ -1758,8 +1829,10 @@ mod tests {
             0x00, 0x00, // rangeShift: 0
         ];
 
-        assert_eq!(Face::from_slice(data, 0).unwrap_err(),
-                   FaceParsingError::MalformedFont);
+        assert_eq!(
+            Face::from_slice(data, 0).unwrap_err(),
+            FaceParsingError::MalformedFont
+        );
     }
 
     #[test]
@@ -1772,8 +1845,10 @@ mod tests {
         ];
 
         assert_eq!(fonts_in_collection(data), Some(0));
-        assert_eq!(Face::from_slice(data, 0).unwrap_err(),
-                   FaceParsingError::FaceIndexOutOfBounds);
+        assert_eq!(
+            Face::from_slice(data, 0).unwrap_err(),
+            FaceParsingError::FaceIndexOutOfBounds
+        );
     }
 
     #[test]
@@ -1786,8 +1861,10 @@ mod tests {
         ];
 
         assert_eq!(fonts_in_collection(data), Some(std::u32::MAX));
-        assert_eq!(Face::from_slice(data, 0).unwrap_err(),
-                   FaceParsingError::MalformedFont);
+        assert_eq!(
+            Face::from_slice(data, 0).unwrap_err(),
+            FaceParsingError::MalformedFont
+        );
     }
 
     #[test]
@@ -1801,7 +1878,9 @@ mod tests {
         ];
 
         assert_eq!(fonts_in_collection(data), Some(1));
-        assert_eq!(Face::from_slice(data, std::u32::MAX).unwrap_err(),
-                   FaceParsingError::FaceIndexOutOfBounds);
+        assert_eq!(
+            Face::from_slice(data, std::u32::MAX).unwrap_err(),
+            FaceParsingError::FaceIndexOutOfBounds
+        );
     }
 }
